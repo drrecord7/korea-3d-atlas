@@ -1,0 +1,214 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>KOREA 3D SKY ATLAS — 1,700 Landmarks & 360° Roadview</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><circle cx='16' cy='16' r='14' fill='%230a0e17' stroke='%2338bdf8' stroke-width='2.5'/><circle cx='16' cy='16' r='5' fill='%2338bdf8'/></svg>" />
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@500;600;700;800&family=Plus+Jakarta+Sans:wght@400;500;600;700&family=Noto+Sans+KR:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="vendor/maplibre-gl.css" />
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <!-- Fullscreen 3D Aerial Skyview Canvas -->
+  <div id="map-wrap">
+    <div id="map"></div>
+
+    <!-- Subtle Atmospheric Vignette for Spatial HUD Depth -->
+    <div class="skyview-vignette" aria-hidden="true"></div>
+
+    <!-- Cinematic Optical Dive Tunnel (3D Skyview -> Ground 360° Roadview) -->
+    <div id="warp-overlay" class="warp-overlay hidden" aria-hidden="true">
+      <div class="warp-ring r1"></div>
+      <div class="warp-ring r2"></div>
+      <div class="warp-ring r3"></div>
+      <div class="warp-center-badge">
+        <span class="warp-tag">360° STREET ROADVIEW DESCENT</span>
+        <strong id="warp-spot-title">경복궁 광화문</strong>
+        <span id="warp-spot-sub">3D 스카이뷰에서 지상 360° 로드뷰로 강하 중...</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- TOP-RIGHT FLOATING SPATIAL HUD CAPSULE (Camera, Skyview Layers & 13 Languages) -->
+  <nav class="hud-top-right" aria-label="Map & Language Controls">
+    <!-- Skyview Layer Mode Selector -->
+    <div class="hud-segmented" role="group" aria-label="Skyview Mode">
+      <button type="button" class="seg-btn active" data-style="skyview-pure" title="순수 3D 항공 스카이뷰 (최고 가독성)">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 2 7 12 12 22 7 12 2"/><polyline points="2 17 12 22 22 17"/><polyline points="2 12 12 17 22 12"/></svg>
+        <span data-i18n="modePure">3D 스카이뷰</span>
+      </button>
+      <button type="button" class="seg-btn" data-style="skyview-hybrid" title="항공 스카이뷰 + 다국어 도로·지명 표시">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M2 12h20"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
+        <span data-i18n="modeHybrid">지명 하이브리드</span>
+      </button>
+    </div>
+
+    <!-- 3D Tilt & Pin Density Controls -->
+    <div class="hud-pill-group">
+      <button type="button" id="btn-toggle-pitch" class="hud-icon-btn active" title="3D 입체 틸트 각도 전환">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/></svg>
+        <span id="pitch-label">3D 58°</span>
+      </button>
+
+      <button type="button" id="btn-toggle-pins" class="hud-icon-btn" title="핀 라벨 전체 펼치기 / 스마트 클러스터">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
+        <span id="pin-mode-label">Smart Pins</span>
+      </button>
+
+      <button type="button" id="btn-reset-korea" class="hud-icon-btn accent" title="한반도 전체 3D 스카이뷰로 복귀">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polygon points="3 11 22 2 13 21 11 13 3 11"/></svg>
+        <span id="reset-label">All Korea</span>
+      </button>
+    </div>
+
+    <!-- 13-Language Selector -->
+    <div class="hud-lang-box">
+      <svg class="lang-globe-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
+      <label for="lang-select" class="sr-only">Language</label>
+      <select id="lang-select" class="hud-lang-select" aria-label="Select Language">
+        <option value="ko">한국어 · KO</option>
+        <option value="en">English · EN</option>
+        <option value="ja">日本語 · JA</option>
+        <option value="zh-CN">简体中文 · ZH</option>
+        <option value="zh-TW">繁體中文 · TW</option>
+        <option value="es">Español · ES</option>
+        <option value="fr">Français · FR</option>
+        <option value="de">Deutsch · DE</option>
+        <option value="vi">Tiếng Việt · VI</option>
+        <option value="th">ภาษาไทย · TH</option>
+        <option value="id">Indonesia · ID</option>
+        <option value="ru">Русский · RU</option>
+        <option value="ar">العربية · AR</option>
+      </select>
+    </div>
+  </nav>
+
+  <!-- LEFT FLOATING SPATIAL GLASS DOCK -->
+  <aside id="explorer-drawer" class="spatial-dock">
+    <!-- Mobile Drag Handle -->
+    <div id="drawer-drag-handle" class="dock-drag-handle" title="패널 접기/펼치기">
+      <span class="handle-bar"></span>
+    </div>
+
+    <!-- Dock Header: Brand + Integrated Search -->
+    <div class="dock-header">
+      <div class="dock-brand-row">
+        <div class="brand-identity" id="brand-home" role="button" tabindex="0">
+          <span class="brand-beacon"></span>
+          <div>
+            <span class="brand-kicker">KOREA 3D SKY ATLAS</span>
+            <h1 class="brand-title" id="ui-app-title">대한민국 1,700대 명소 스카이뷰</h1>
+          </div>
+        </div>
+        <div class="brand-counter">
+          <strong id="active-spot-count">1,700</strong>
+          <span id="active-spot-unit">SPOTS</span>
+        </div>
+      </div>
+
+      <!-- Sleek Translucent Search -->
+      <div class="dock-search">
+        <svg class="search-icon" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="11" cy="11" r="8"></circle>
+          <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+        </svg>
+        <input
+          type="search"
+          id="spot-search-input"
+          placeholder="Search 1,700 landmarks, palaces, peaks, beaches..."
+          autocomplete="off"
+        />
+        <button type="button" id="btn-clear-search" class="clear-search-btn hidden" aria-label="Clear search">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        </button>
+      </div>
+    </div>
+
+    <!-- 17 Regions Spatial Pill Strip -->
+    <div class="region-strip-wrap">
+      <div class="region-strip" id="region-strip" role="tablist" aria-label="17 Regions of Korea"></div>
+    </div>
+
+    <!-- Active Region Editorial Context & Category Filter -->
+    <div class="dock-context">
+      <div class="context-title-row">
+        <h2 class="context-heading" id="active-region-title">All 17 Regions of Korea</h2>
+        <span class="context-code" id="active-region-badge">17 PROVINCES</span>
+      </div>
+      <p class="context-desc" id="active-region-desc">
+        Select a province on the 3D Skyview or choose a landmark below to descend directly into a live 360° street-level Roadview.
+      </p>
+
+      <div class="category-chips" id="category-chips">
+        <button type="button" class="cat-chip active" data-cat="all" id="cat-label-all">All</button>
+        <button type="button" class="cat-chip" data-cat="heritage" id="cat-label-heritage">Heritage</button>
+        <button type="button" class="cat-chip" data-cat="nature" id="cat-label-nature">Nature & Peaks</button>
+        <button type="button" class="cat-chip" data-cat="coastal" id="cat-label-coastal">Coast & Islands</button>
+        <button type="button" class="cat-chip" data-cat="culture" id="cat-label-culture">Art & Culture</button>
+        <button type="button" class="cat-chip" data-cat="market" id="cat-label-market">Local Markets</button>
+      </div>
+    </div>
+
+    <!-- Scrollable 100-Spot Editorial List -->
+    <div class="spot-list-container" id="spot-list-container">
+      <div class="spot-list" id="spot-list"></div>
+    </div>
+  </aside>
+
+  <!-- FULL-BLEED IMMERSIVE 360° ROADVIEW VIEWPORT (Zero External Links) -->
+  <section id="roadview-modal" class="roadview-modal hidden" aria-modal="true" role="dialog">
+    <!-- Floating Translucent Glass HUD Bar over the 360° Panorama -->
+    <header class="rv-hud-bar">
+      <div class="rv-hud-left">
+        <span class="rv-rank-pill" id="rv-rank-badge">#01 SEOUL</span>
+        <div class="rv-hud-titles">
+          <h2 id="rv-spot-title">경복궁 광화문</h2>
+          <p id="rv-spot-meta">37.5759° N, 126.9769° E</p>
+        </div>
+      </div>
+
+      <div class="rv-hud-right">
+        <!-- Segmented Toggle ONLY when both Street Roadview & Interior Footpath View exist -->
+        <div id="rv-mode-group" class="rv-mode-group">
+          <button type="button" id="btn-rv-kakao-road" class="rv-mode-btn active">
+            <span id="label-rv-kakao-road">Street 360°</span>
+          </button>
+          <button type="button" id="btn-rv-kakao-walk" class="rv-mode-btn hidden">
+            <span id="label-rv-kakao-walk">Interior Walk 360°</span>
+          </button>
+        </div>
+
+        <button type="button" id="btn-close-rv" class="rv-back-btn" title="ESC">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
+          <span id="rv-back-label">3D 스카이뷰로 복귀</span>
+        </button>
+      </div>
+    </header>
+
+    <!-- Fullscreen 360° Panorama Stage -->
+    <div class="rv-stage">
+      <div id="rv-loading" class="rv-loading">
+        <div class="rv-pulse-ring"></div>
+        <p id="rv-loading-text">Loading 360° Street Roadview...</p>
+      </div>
+      <iframe
+        id="kakao-rv-iframe"
+        title="360 Street Roadview Panorama"
+        src="about:blank"
+        allow="accelerometer; gyroscope; fullscreen"
+        allowfullscreen
+      ></iframe>
+    </div>
+  </section>
+
+  <!-- Data & Engine Scripts -->
+  <script src="vendor/maplibre-gl.js"></script>
+  <script src="data/korea-geo-3d.js"></script>
+  <script src="data/spots-1700.js"></script>
+  <script src="data/i18n-guides.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
